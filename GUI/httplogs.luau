@@ -1,30 +1,141 @@
 local module = {}
 module.Logs = {}
+module.Enabled = true
+module.BlockRequests = false
 module.Connections = {}
-module.ObjectConnections = {}
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
 local TweenInfoOpen = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local TweenInfoClose = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-local function getPath(obj)
-	if not obj then return "nil" end
-	local path = obj.Name
-	local current = obj.Parent
-	while current and current ~= game do
-		path = current.Name .. "." .. path
-		current = current.Parent
+local function logRequest(method, url, body)
+	if not module.Enabled then return end
+	
+	local formattedBody = body
+	if body and type(body) == "string" and (body:sub(1,1) == "{" or body:sub(1,1) == "[") then
+		pcall(function()
+			formattedBody = HttpService:JSONEncode(HttpService:JSONDecode(body))
+		end)
 	end
-	return "game." .. path
+
+	module.AddLog(method, url, formattedBody)
 end
 
-	local function makeDraggable(frame)
+if getgenv().Nexs_Original_HttpGet then
+	pcall(function() hookfunction(game.HttpGet, getgenv().Nexs_Original_HttpGet) end)
+end
+if getgenv().Nexs_Original_HttpPost then
+	pcall(function() hookfunction(game.HttpPost, getgenv().Nexs_Original_HttpPost) end)
+end
+
+pcall(function()
+	getgenv().Nexs_Original_HttpGet = hookfunction(game.HttpGet, function(self, url, ...)
+		if module.BlockRequests then
+			task.spawn(logRequest, "HttpGet [BLOCKED]", url)
+			return ""
+		end
+		task.spawn(logRequest, "HttpGet", url)
+		return getgenv().Nexs_Original_HttpGet(self, url, ...)
+	end)
+end)
+
+pcall(function()
+	getgenv().Nexs_Original_HttpPost = hookfunction(game.HttpPost, function(self, url, body, ...)
+		if module.BlockRequests then
+			task.spawn(logRequest, "HttpPost [BLOCKED]", url, body)
+			return ""
+		end
+		task.spawn(logRequest, "HttpPost", url, body)
+		return getgenv().Nexs_Original_HttpPost(self, url, body, ...)
+	end)
+end)
+
+local mt = getrawmetatable(game)
+if mt then
+	setreadonly(mt, false)
+	local oldNamecall = mt.__namecall
+	
+	mt.__namecall = newcclosure(function(self, ...)
+		local method = getnamecallmethod()
+		local args = {...}
+		
+		if method == "HttpGet" or method == "HttpGetAsync" then
+			if module.BlockRequests then
+				task.spawn(logRequest, "HttpGet [BLOCKED]", args[1])
+				return ""
+			end
+			task.spawn(logRequest, "HttpGet", args[1])
+		elseif method == "HttpPost" or method == "HttpPostAsync" then
+			if module.BlockRequests then
+				task.spawn(logRequest, "HttpPost [BLOCKED]", args[1], args[2])
+				return ""
+			end
+			task.spawn(logRequest, "HttpPost", args[1], args[2])
+		end
+		
+		return oldNamecall(self, ...)
+	end)
+	
+	setreadonly(mt, true)
+end
+
+if type(request) == "function" then
+	local oldRequest = request
+	pcall(function()
+		hookfunction(request, function(options)
+			if type(options) == "table" then
+				if module.BlockRequests then
+					task.spawn(logRequest, (options.Method or "GET") .. " [BLOCKED]", options.Url, options.Body)
+					return {Body = "", StatusCode = 403, StatusMessage = "Blocked by HttpSpy"}
+				end
+				task.spawn(logRequest, options.Method or "GET", options.Url, options.Body)
+			end
+			return oldRequest(options)
+		end)
+	end)
+elseif type(http_request) == "function" then
+	local oldRequest = http_request
+	pcall(function()
+		hookfunction(http_request, function(options)
+			if type(options) == "table" then
+				if module.BlockRequests then
+					task.spawn(logRequest, (options.Method or "GET") .. " [BLOCKED]", options.Url, options.Body)
+					return {Body = "", StatusCode = 403, StatusMessage = "Blocked by HttpSpy"}
+				end
+				task.spawn(logRequest, options.Method or "GET", options.Url, options.Body)
+			end
+			return oldRequest(options)
+		end)
+	end)
+elseif type(syn) == "table" and type(syn.request) == "function" then
+	local oldRequest = syn.request
+	pcall(function()
+		hookfunction(syn.request, function(options)
+			if type(options) == "table" then
+				if module.BlockRequests then
+					task.spawn(logRequest, (options.Method or "GET") .. " [BLOCKED]", options.Url, options.Body)
+					return {Body = "", StatusCode = 403, StatusMessage = "Blocked by HttpSpy"}
+				end
+				task.spawn(logRequest, options.Method or "GET", options.Url, options.Body)
+			end
+			return oldRequest(options)
+		end)
+	end)
+end
+
+table.insert(module.Logs, {
+	Method = "System",
+	Url = "Http Spy Initialized - Async Logging Active",
+	Body = "Hooks active",
+	Time = os.time()
+})
+
+local function makeDraggable(frame)
 	local dragging = false
 	local dragInput
 	local dragStart
@@ -62,14 +173,14 @@ end
 
 function module.GUI()
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "EventLoggerUI"
+	screenGui.Name = "HttpLogsUI"
 	screenGui.ResetOnSpawn = false
 	screenGui.Parent = game.CoreGui
 	screenGui.Enabled = false
 	
 	local mainFrame = Instance.new("Frame")
-	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 400, 0, 320)
+	mainFrame.Name = "HttpLogsUI"
+	mainFrame.Size = UDim2.new(0, 450, 0, 320)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) 
@@ -111,7 +222,7 @@ function module.GUI()
 	searchInput.Position = UDim2.new(0, 15, 0, 0)
 	searchInput.BackgroundTransparency = 1
 	searchInput.Text = ""
-	searchInput.PlaceholderText = "Search events..."
+	searchInput.PlaceholderText = "Search requests..."
 	searchInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
 	searchInput.TextColor3 = Color3.fromRGB(220, 220, 220)
 	searchInput.Font = Enum.Font.GothamMedium
@@ -183,15 +294,21 @@ function module.GUI()
 	end
 
 	local clearButton, clearStroke = createStyledButton("ClearButton", "Clear Logs", UDim2.new(0, 15, 0, 8), 80)
-	local enabled = true
-	local enabledButton, enabledStroke = createStyledButton("EnabledButton", "Status: ON", UDim2.new(0, 105, 0, 8), 90)
+	local enabledButton, enabledStroke = createStyledButton("EnabledButton", module.Enabled and "Status: ON" or "Status: OFF", UDim2.new(0, 105, 0, 8), 90)
+	local blockButton, blockStroke = createStyledButton("BlockButton", "Block: OFF", UDim2.new(0, 205, 0, 8), 90)
 	
 	enabledButton.MouseButton1Click:Connect(function()
-		enabled = not enabled
-		enabledButton.Text = enabled and "Status: ON" or "Status: OFF"
-		enabledButton.TextColor3 = enabled and Color3.fromRGB(200, 200, 200) or Color3.fromRGB(150, 150, 150)
+		module.Enabled = not module.Enabled
+		enabledButton.Text = module.Enabled and "Status: ON" or "Status: OFF"
+		enabledButton.TextColor3 = module.Enabled and Color3.fromRGB(200, 200, 200) or Color3.fromRGB(150, 150, 150)
 	end)
-	
+
+	blockButton.MouseButton1Click:Connect(function()
+		module.BlockRequests = not module.BlockRequests
+		blockButton.Text = module.BlockRequests and "Block: ON" or "Block: OFF"
+		blockButton.TextColor3 = module.BlockRequests and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(200, 200, 200)
+	end)
+
 	local scrollingFrame = Instance.new("ScrollingFrame")
 	scrollingFrame.Name = "List"
 	scrollingFrame.Size = UDim2.new(1, 0, 1, -81)
@@ -232,30 +349,30 @@ function module.GUI()
 		itemStroke.Transparency = 1
 		itemStroke.Parent = itemFrame
 		
-		local typeLabel = Instance.new("TextLabel")
-		typeLabel.Size = UDim2.new(0, 80, 0, 20)
-		typeLabel.Position = UDim2.new(0, 10, 0, 5)
-		typeLabel.BackgroundTransparency = 1
-		typeLabel.Font = Enum.Font.GothamBold
-		typeLabel.TextSize = 12
-		typeLabel.TextXAlignment = Enum.TextXAlignment.Left
-		typeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-		typeLabel.Text = log.Type
-		typeLabel.TextTransparency = 1
-		typeLabel.Parent = itemFrame
+		local methodLabel = Instance.new("TextLabel")
+		methodLabel.Size = UDim2.new(0, 60, 0, 20)
+		methodLabel.Position = UDim2.new(0, 10, 0, 5)
+		methodLabel.BackgroundTransparency = 1
+		methodLabel.Font = Enum.Font.GothamBold
+		methodLabel.TextSize = 12
+		methodLabel.TextXAlignment = Enum.TextXAlignment.Left
+		methodLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+		methodLabel.Text = log.Method
+		methodLabel.TextTransparency = 1
+		methodLabel.Parent = itemFrame
 		
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Size = UDim2.new(1, -90, 0, 20)
-		nameLabel.Position = UDim2.new(0, 90, 0, 5)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.Font = Enum.Font.Gotham
-		nameLabel.TextSize = 12
-		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-		nameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-		nameLabel.Text = log.Name
-		nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-		nameLabel.TextTransparency = 1
-		nameLabel.Parent = itemFrame
+		local urlLabel = Instance.new("TextLabel")
+		urlLabel.Size = UDim2.new(1, -80, 0, 20)
+		urlLabel.Position = UDim2.new(0, 70, 0, 5)
+		urlLabel.BackgroundTransparency = 1
+		urlLabel.Font = Enum.Font.Gotham
+		urlLabel.TextSize = 12
+		urlLabel.TextXAlignment = Enum.TextXAlignment.Left
+		urlLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+		urlLabel.Text = log.Url
+		urlLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		urlLabel.TextTransparency = 1
+		urlLabel.Parent = itemFrame
 		
 		local function createActionBtn(text, xOffset)
 			local btn = Instance.new("TextButton")
@@ -284,31 +401,27 @@ function module.GUI()
 		end
 		
 		local copyButton, copyStroke = createActionBtn("Copy", -115)
-		local fireButton, fireStroke = createActionBtn("Fire", -60)
+		local runButton, runStroke = createActionBtn("Run", -60)
 		
 		copyButton.MouseButton1Click:Connect(function()
-			if log.Object then
-				setclipboard(getPath(log.Object))
-			end
+			setclipboard(log.Url)
 		end)
 		
-		fireButton.MouseButton1Click:Connect(function()
-			if log.Object then
-				if log.Type == "ProximityPrompt" then
-					fireproximityprompt(log.Object)
-				elseif log.Type == "ClickDetector" then
-					fireclickdetector(log.Object)
-				elseif log.Type == "TouchInterest" then
-					if log.Object.Parent then
-						firetouchinterest(LocalPlayer.Character.HumanoidRootPart, log.Object.Parent, 0)
-						task.wait()
-						firetouchinterest(LocalPlayer.Character.HumanoidRootPart, log.Object.Parent, 1)
-					end
+		runButton.MouseButton1Click:Connect(function()
+			if log.Method == "HttpGet" then
+				game:HttpGet(log.Url)
+			elseif log.Method == "HttpPost" then
+				game:HttpPost(log.Url, log.Body or "")
+			elseif log.Method == "GET" or log.Method == "POST" then
+				if request then
+					request({Url = log.Url, Method = log.Method, Body = log.Body})
+				elseif http_request then
+					http_request({Url = log.Url, Method = log.Method, Body = log.Body})
 				end
 			end
 		end)
 		
-		return itemFrame, {itemStroke, copyStroke, fireStroke}
+		return itemFrame, {itemStroke, copyStroke, runStroke}
 	end
 	
 	local function updateList(query)
@@ -322,7 +435,9 @@ function module.GUI()
 			local match = false
 			if query == "" then
 				match = true
-			elseif string.find(string.lower(log.Name), string.lower(query)) then
+			elseif string.find(string.lower(log.Url), string.lower(query)) then
+				match = true
+			elseif string.find(string.lower(log.Method), string.lower(query)) then
 				match = true
 			end
 			
@@ -348,18 +463,11 @@ function module.GUI()
 		scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, count * 54 + 10)
 	end
 	
-	local function addLog(type, object)
-		if not object or not enabled then return end
-		
-		local displayName = object.Name
-		if object.Parent then
-			displayName = getPath(object.Parent)
-		end
-		
+	function module.AddLog(method, url, body)
 		table.insert(module.Logs, {
-			Type = type,
-			Name = displayName,
-			Object = object,
+			Method = method,
+			Url = url,
+			Body = body,
 			Time = os.time()
 		})
 		if screenGui.Enabled then
@@ -367,52 +475,7 @@ function module.GUI()
 		end
 	end
 	
-	table.insert(module.Connections, ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-		if player == LocalPlayer then
-			addLog("ProximityPrompt", prompt)
-		end
-	end))
-	
-	local function setupClickDetector(cd)
-		if module.ObjectConnections[cd] then return end
-		module.ObjectConnections[cd] = cd.MouseClick:Connect(function(player)
-			if player == LocalPlayer then
-				addLog("ClickDetector", cd)
-			end
-		end)
-	end
-	
-	for _, v in ipairs(workspace:GetDescendants()) do
-		if v:IsA("ClickDetector") then
-			setupClickDetector(v)
-		end
-	end
-	
-	table.insert(module.Connections, workspace.DescendantAdded:Connect(function(desc)
-		if desc:IsA("ClickDetector") then
-			setupClickDetector(desc)
-		end
-	end))
-	
 	makeDraggable(mainFrame)
-
-	local function setupCharacter(char)
-		if not char then return end
-		local hrp = char:WaitForChild("HumanoidRootPart", 5)
-		if not hrp then return end
-		
-		table.insert(module.Connections, hrp.Touched:Connect(function(hit)
-			if hit:FindFirstChild("TouchInterest") then
-				addLog("TouchInterest", hit:FindFirstChild("TouchInterest"))
-			end
-		end))
-	end
-	
-	if LocalPlayer.Character then
-		setupCharacter(LocalPlayer.Character)
-	end
-	table.insert(module.Connections, LocalPlayer.CharacterAdded:Connect(setupCharacter))
-	
 	
 	local function toggle(state)
 		if state then
@@ -431,6 +494,9 @@ function module.GUI()
 			
 			TweenService:Create(enabledButton, TweenInfoOpen, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
 			TweenService:Create(enabledStroke, TweenInfoOpen, {Transparency = 0}):Play()
+			
+			TweenService:Create(blockButton, TweenInfoOpen, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
+			TweenService:Create(blockStroke, TweenInfoOpen, {Transparency = 0}):Play()
 			
 			TweenService:Create(scrollingFrame, TweenInfoOpen, {ScrollBarImageTransparency = 0}):Play()
 			
@@ -464,6 +530,9 @@ function module.GUI()
 			
 			TweenService:Create(enabledButton, TweenInfoClose, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
 			TweenService:Create(enabledStroke, TweenInfoClose, {Transparency = 1}):Play()
+			
+			TweenService:Create(blockButton, TweenInfoClose, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+			TweenService:Create(blockStroke, TweenInfoClose, {Transparency = 1}):Play()
 			
 			TweenService:Create(scrollingFrame, TweenInfoClose, {ScrollBarImageTransparency = 1}):Play()
 			
@@ -519,17 +588,15 @@ function module.Cleanup()
 	for _, connection in ipairs(module.Connections) do
 		connection:Disconnect()
 	end
-	for _, connection in pairs(module.ObjectConnections) do
-		connection:Disconnect()
-	end
 	module.Connections = {}
-	module.ObjectConnections = {}
 	
 	local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-	local gui = PlayerGui:FindFirstChild("EventLoggerUI")
+	local gui = PlayerGui:FindFirstChild("HttpLogsUI")
 	if gui then
 		gui:Destroy()
 	end
+	
+	module.Enabled = false
 end
 
 return module

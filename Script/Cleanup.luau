@@ -28,6 +28,9 @@ function module.Run(Notifications)
 	local oldEventLoggerUI = game.CoreGui:FindFirstChild("EventLoggerUI")
 	if oldEventLoggerUI then oldEventLoggerUI:Destroy() end
 	
+	local oldHttpLogsUI = game.CoreGui:FindFirstChild("HttpLogsUI")
+	if oldHttpLogsUI then oldHttpLogsUI:Destroy() end
+	
 	getgenv().NexsCredit = nil
 end
 
