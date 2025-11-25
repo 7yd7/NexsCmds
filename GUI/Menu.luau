@@ -12,13 +12,15 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local OpenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local CloseInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-function module.RegisterCommand(name, args, desc, aliases, callback, argsColor)
+function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, suggestions, argsCustomColors)
     module.Commands[name] = {
         Args = args,
         Desc = desc,
         Aliases = aliases,
         Callback = callback,
-        ArgsColor = argsColor
+        ArgsColor = argsColor,
+        Suggestions = suggestions,
+        ArgsCustomColors = argsCustomColors
     }
     table.insert(module.CommandOrder, name)
 end
@@ -124,7 +126,7 @@ function module.GUI()
     listPadding.PaddingRight = UDim.new(0, 10)
     listPadding.Parent = listContainer
 
-    local function createCommandItem(name, args, desc, aliases, argsColor)
+    local function createCommandItem(name, args, desc, aliases, argsColor, argsCustomColors)
         local itemFrame = Instance.new("TextButton")
         itemFrame.Name = name
         itemFrame.Size = UDim2.new(1, 0, 0, 50)
@@ -148,13 +150,22 @@ function module.GUI()
             displayName = string.format('<font color="#E0E0E0">%s</font>', name:gsub("<", "&lt;"):gsub(">", "&gt;"))
         end
 
-        local displayArgs = args
+        local displayArgs = ""
         if not string.find(args, "<font") then
-            local colorHex = "#8DA5C9"
-            if argsColor then
-                colorHex = "#" .. argsColor:ToHex()
+            local splitArgs = args:split(" ")
+            for i, arg in ipairs(splitArgs) do
+                local colorHex = "#8DA5C9" 
+                
+                if argsCustomColors and argsCustomColors[i] then
+                    colorHex = "#" .. argsCustomColors[i]:ToHex()
+                elseif argsColor then
+                    colorHex = "#" .. argsColor:ToHex()
+                end
+                
+                displayArgs = displayArgs .. string.format('<font color="%s">%s</font> ', colorHex, arg:gsub("<", "&lt;"):gsub(">", "&gt;"))
             end
-            displayArgs = string.format('<font color="%s">%s</font>', colorHex, args:gsub("<", "&lt;"):gsub(">", "&gt;"))
+        else
+            displayArgs = args
         end
         
         titleLabel.Text = displayName .. " " .. displayArgs
@@ -197,17 +208,19 @@ function module.GUI()
         itemFrame.AutoButtonColor = false
         itemFrame.Parent = listContainer
 
-        local avatarImage = Instance.new("ImageLabel")
-        avatarImage.Name = "Avatar"
-        avatarImage.Size = UDim2.new(0, 40, 0, 40)
-        avatarImage.Position = UDim2.new(1, -45, 0.5, -20) 
-        avatarImage.BackgroundTransparency = 1
-        avatarImage.Image = imageId
-        avatarImage.Parent = itemFrame
-        
-        local avatarCorner = Instance.new("UICorner")
-        avatarCorner.CornerRadius = UDim.new(1, 0)
-        avatarCorner.Parent = avatarImage
+        if imageId and imageId ~= "" then
+            local avatarImage = Instance.new("ImageLabel")
+            avatarImage.Name = "Avatar"
+            avatarImage.Size = UDim2.new(0, 40, 0, 40)
+            avatarImage.Position = UDim2.new(1, -45, 0.5, -20) 
+            avatarImage.BackgroundTransparency = 1
+            avatarImage.Image = imageId
+            avatarImage.Parent = itemFrame
+            
+            local avatarCorner = Instance.new("UICorner")
+            avatarCorner.CornerRadius = UDim.new(1, 0)
+            avatarCorner.Parent = avatarImage
+        end
 
         local mainLabel = Instance.new("TextLabel")
         mainLabel.Name = "MainText"
@@ -285,7 +298,16 @@ function module.GUI()
         end
 
         if #args > 1 and cmdData then
-            if string.find(string.lower(cmdData.Args), "player") then
+            local argIndex = #args - 1
+            local suggestionType = nil
+            
+            if cmdData.Suggestions and cmdData.Suggestions[argIndex] then
+                suggestionType = cmdData.Suggestions[argIndex]
+            elseif string.find(string.lower(cmdData.Args), "player") and argIndex == 1 then
+                suggestionType = "Player"
+            end
+
+            if suggestionType == "Player" then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if count >= 5 then break end
                     if player == LocalPlayer then continue end
@@ -296,6 +318,15 @@ function module.GUI()
                         local imageId = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
                         createSuggestionItem(player.DisplayName, "@" .. player.Name, imageId, player.Name)
                         table.insert(currentSuggestions, player.Name)
+                        count = count + 1
+                    end
+                end
+            elseif type(suggestionType) == "table" then
+                for _, item in ipairs(suggestionType) do
+                    if count >= 5 then break end
+                    if string.find(string.lower(item), string.lower(currentArg)) then
+                        createSuggestionItem(item, "Suggestion", "", item)
+                        table.insert(currentSuggestions, item)
                         count = count + 1
                     end
                 end
@@ -325,7 +356,7 @@ function module.GUI()
                 end
 
                 if match then
-                    createCommandItem(name, data.Args, data.Desc, data.Aliases, data.ArgsColor)
+                    createCommandItem(name, data.Args, data.Desc, data.Aliases, data.ArgsColor, data.ArgsCustomColors)
                     
                     if #args == 1 then
                         table.insert(currentSuggestions, name)

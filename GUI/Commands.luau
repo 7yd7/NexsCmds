@@ -13,14 +13,17 @@ local TweenInfoOpen = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirec
 local TweenInfoClose = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 
-function module.RegisterCommand(name, args, desc, aliases, callback)
+function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, category)
 	module.Commands[name] = {
 		Args = args,
 		Desc = desc,
 		Aliases = aliases,
-		Callback = callback
+		Callback = callback,
+		Category = category or "Standard"
 	}
-	table.insert(module.CommandOrder, name)
+	if not table.find(module.CommandOrder, name) then
+		table.insert(module.CommandOrder, name)
+	end
 end
 
 local function makeDraggable(frame)
@@ -170,6 +173,20 @@ function module.GUI()
 	listPadding.PaddingBottom = UDim.new(0, 5)
 	listPadding.Parent = scrollingFrame
 	
+	local function createHeaderLabel(text)
+		local label = Instance.new("TextLabel")
+		label.Name = "Header_" .. text
+		label.Size = UDim2.new(1, -20, 0, 20)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 14
+		label.TextColor3 = Color3.fromRGB(255, 200, 100)
+		label.Text = text
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextTransparency = 1
+		label.Parent = scrollingFrame
+	end
+
 	local function createItem(name, aliases)
 		local label = Instance.new("TextLabel")
 		label.Name = name
@@ -195,7 +212,9 @@ function module.GUI()
 			if child:IsA("TextLabel") then child:Destroy() end
 		end
 		
-		local count = 0
+		local gameCmds = {}
+		local allCmds = {}
+		
 		for _, name in ipairs(module.CommandOrder) do
 			local cmd = module.Commands[name]
 			local match = false
@@ -208,7 +227,40 @@ function module.GUI()
 			end
 			
 			if match then
-				createItem(name, cmd.Aliases)
+				if cmd.Category == "Game" then
+					table.insert(gameCmds, name)
+				else
+					table.insert(allCmds, name)
+				end
+			end
+		end
+		
+		local count = 0
+		
+		if #gameCmds > 0 then
+			local success, info = pcall(function()
+				return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+			end)
+			local gameName = success and info.Name or "Game Specific"
+			
+			createHeaderLabel(gameName)
+			count = count + 1
+			for _, name in ipairs(gameCmds) do
+				createItem(name, module.Commands[name].Aliases)
+				count = count + 1
+			end
+			
+			if #allCmds > 0 then
+				createHeaderLabel("All Game")
+				count = count + 1
+				for _, name in ipairs(allCmds) do
+					createItem(name, module.Commands[name].Aliases)
+					count = count + 1
+				end
+			end
+		else
+			for _, name in ipairs(allCmds) do
+				createItem(name, module.Commands[name].Aliases)
 				count = count + 1
 			end
 		end

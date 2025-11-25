@@ -1,6 +1,6 @@
 local module = {}
 
-function module.Start(GUI, BASE_URL)
+function module.Start(GUIMenu, GUICommands, BASE_URL)
 	if BASE_URL:sub(-1) == "/" then
 		BASE_URL = BASE_URL:sub(1, -2)
 	end
@@ -58,17 +58,101 @@ function module.Start(GUI, BASE_URL)
 			local commandModule = import("Commands/" .. moduleName)
 			
 			if commandModule and type(commandModule) == "table" then
-				GUI.RegisterCommand(
-					commandModule.Name,
-					commandModule.Args,
-					commandModule.Description,
-					commandModule.Aliases,
-					commandModule.Callback,
-					commandModule.ArgsColor
-				)
+				if GUIMenu and GUIMenu.RegisterCommand then
+					GUIMenu.RegisterCommand(
+						commandModule.Name,
+						commandModule.Args,
+						commandModule.Description,
+						commandModule.Aliases,
+						commandModule.Callback,
+						commandModule.ArgsColor,
+						commandModule.Suggestions,
+						commandModule.ArgsCustomColors
+					)
+				end
+				
+				if GUICommands and GUICommands.RegisterCommand then
+					GUICommands.RegisterCommand(
+						commandModule.Name,
+						commandModule.Args,
+						commandModule.Description,
+						commandModule.Aliases,
+						commandModule.Callback,
+						commandModule.ArgsColor,
+						"Standard"
+					)
+				end
 			end
 		end)
 	end
+	
+	task.spawn(function()
+		local ROOT_FOLDER = "NexsCommands"
+		local GLOBAL_FOLDER = ROOT_FOLDER .. "/Global"
+		local GAMES_FOLDER = ROOT_FOLDER .. "/Games"
+		local GAME_ID = tostring(game.PlaceId)
+		local GAME_SPECIFIC_FOLDER = GAMES_FOLDER .. "/" .. GAME_ID
+		
+		local function loadExternal(path, category)
+			if not isfile(path) then 
+				return 
+			end
+			
+			local content = readfile(path)
+			local success, result = pcall(function()
+				return loadstring(content)()
+			end)
+			
+			if success and type(result) == "table" then
+				if GUIMenu and GUIMenu.RegisterCommand then
+					GUIMenu.RegisterCommand(
+						result.Name,
+						result.Args,
+						result.Description,
+						result.Aliases,
+						result.Callback,
+						result.ArgsColor,
+						result.Suggestions,
+						result.ArgsCustomColors
+					)
+				end
+				
+				if GUICommands and GUICommands.RegisterCommand then
+					GUICommands.RegisterCommand(
+						result.Name,
+						result.Args,
+						result.Description,
+						result.Aliases,
+						result.Callback,
+						result.ArgsColor,
+						category
+					)
+				end
+			else
+				warn("[Nexs Debug] Failed to load external command: " .. path .. " | Error: " .. tostring(result))
+			end
+		end
+		
+		if isfolder(GLOBAL_FOLDER) then
+			for _, file in ipairs(listfiles(GLOBAL_FOLDER)) do
+				if file:sub(-5) == ".luau" then
+					loadExternal(file, "Global")
+				end
+			end
+		else
+			warn("[Nexs Debug] Global Folder not found!")
+		end
+		
+		if isfolder(GAME_SPECIFIC_FOLDER) then
+			for _, file in ipairs(listfiles(GAME_SPECIFIC_FOLDER)) do
+				if file:sub(-5) == ".luau" then
+					loadExternal(file, "Game")
+				end
+			end
+		else
+			warn("[Nexs Debug] Game Folder not found: " .. GAME_SPECIFIC_FOLDER)
+		end
+	end)
 end
 
 return module

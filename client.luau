@@ -1,5 +1,5 @@
 local BASE_URL = "https://raw.githubusercontent.com/7yd7/NexsCmds/Menu/"
-
+-- local BASE_URL = "https://raw.githubusercontent.com/7yd7/NexsCmds/Menu/"
 getgenv().NEXS_BASE_URL = BASE_URL
 
 if BASE_URL:sub(-1) == "/" then
@@ -42,24 +42,36 @@ local function import(name)
 end
 
 local GUIMenu = import("GUI/Menu.luau")
+local GUICommands = import("GUI/Commands.luau")
 local Notifications = import("GUI/notifications.luau")
 getgenv().NexsNotifications = Notifications
 
 local OpenUI = import("GUI/OpenUI.luau")
 local RegisterCommand = import("Script/RegisterCommand.luau")
 local Cleanup = import("Script/Cleanup.luau")
+local ExternalCommands = import("GUI/ExternalCommands.luau")
+getgenv().Nexs_ExternalGUI = ExternalCommands
+
 local UserInputService = game:GetService("UserInputService")
 
 if Cleanup and Notifications then
 	Cleanup.Run(Notifications)
 end
 
-if RegisterCommand and GUIMenu then
-	RegisterCommand.Start(GUIMenu, BASE_URL)
+if RegisterCommand and GUIMenu and GUICommands then
+	RegisterCommand.Start(GUIMenu, GUICommands, BASE_URL)
 end
 
 if GUIMenu then
 	GUIMenu.GUI()
+end
+
+if GUICommands then
+	GUICommands.GUI()
+end
+
+if ExternalCommands then
+	ExternalCommands.GUI()
 end
 
 task.spawn(function()

@@ -50,15 +50,13 @@ return {
 					local tHrp = tChar.HumanoidRootPart
 					local lHrp = lChar.HumanoidRootPart
 					
-					-- Ensure velocity for fling
 					if not lHrp:FindFirstChild("SpinFling") then
 						angularVelocity:Clone().Parent = lHrp
 					end
 					
 					lHrp.Velocity = Vector3.new(0, 0, 0)
-					lHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 0) -- Inside them
+					lHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 0) 
 					
-					-- Keep player alive/noclip
 					for _, part in ipairs(lChar:GetDescendants()) do
 						if part:IsA("BasePart") then
 							part.CanCollide = false
@@ -68,7 +66,6 @@ return {
 				RunService.Heartbeat:Wait()
 			end
 			
-			-- Cleanup
 			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
 				local s = LocalPlayer.Character.HumanoidRootPart:FindFirstChild("SpinFling")
 				if s then s:Destroy() end
