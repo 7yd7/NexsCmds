@@ -30,13 +30,17 @@ end
 local function saveCommand(name, content, isGameSpecific)
 	ensureFolders()
 	local folder = isGameSpecific and getGameFolder() or GLOBAL_FOLDER
-	writefile(folder .. "/" .. name .. ".luau", content)
+	if not name:match("%.luau$") then
+		name = name .. ".luau"
+	end
+	writefile(folder .. "/" .. name, content)
 end
 
 local function deleteCommand(name, isGameSpecific)
 	ensureFolders()
 	local folder = isGameSpecific and getGameFolder() or GLOBAL_FOLDER
-	local path = folder .. "/" .. name .. ".luau"
+	local path = folder .. "/" .. name
+	if not path:match("%.luau$") then path = path .. ".luau" end
 	if isfile(path) then delfile(path) end
 end
 
@@ -47,8 +51,14 @@ local function listCommands(targetFolder)
 	if isfolder(targetFolder) then
 		for _, file in ipairs(listfiles(targetFolder)) do
 			if file:sub(-5) == ".luau" then
-				local name = file:match("([^/\\]+)%.luau$")
-				table.insert(cmds, {Name = name, Path = file})
+				local fileName = file:match("([^/\\]+)%.luau$")
+				local content = readfile(file)
+				-- Try to extract module.Name from content
+				local internalName = content:match('module%.Name%s*=%s*"([^"]+)"') or 
+									 content:match("module%.Name%s*=%s*'([^']+)'") or 
+									 fileName
+				
+				table.insert(cmds, {Name = internalName, FileName = fileName, Path = file})
 			end
 		end
 	end
@@ -99,425 +109,387 @@ function module.GUI()
 	screenGui.Parent = game.CoreGui
 	screenGui.Enabled = false
 	
+	-- Main Window
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 600, 0, 450)
+	mainFrame.Size = UDim2.new(0, 700, 0, 500)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	mainFrame.BackgroundTransparency = 1
+	mainFrame.BackgroundTransparency = 0.1
 	mainFrame.BorderSizePixel = 0
 	mainFrame.ClipsDescendants = true
 	mainFrame.Parent = screenGui
 	
 	local uiCorner = Instance.new("UICorner")
-	uiCorner.CornerRadius = UDim.new(0, 8)
+	uiCorner.CornerRadius = UDim.new(0, 10)
 	uiCorner.Parent = mainFrame
 	
 	local uiStroke = Instance.new("UIStroke")
-	uiStroke.Color = Color3.fromRGB(50, 50, 50)
+	uiStroke.Color = Color3.fromRGB(60, 60, 60)
 	uiStroke.Thickness = 1
-	uiStroke.Transparency = 1
+	uiStroke.Transparency = 0.5
 	uiStroke.Parent = mainFrame
 	
 	makeDraggable(mainFrame)
 	
+	-- Header
 	local header = Instance.new("Frame")
 	header.Name = "Header"
-	header.Size = UDim2.new(1, 0, 0, 40)
+	header.Size = UDim2.new(1, 0, 0, 50)
 	header.BackgroundTransparency = 1
 	header.Parent = mainFrame
 	
 	local title = Instance.new("TextLabel")
-	title.Text = "External Commands Manager"
+	title.Text = "File Explorer"
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = 16
+	title.TextSize = 18
 	title.TextColor3 = Color3.fromRGB(220, 220, 220)
-	title.Size = UDim2.new(1, -40, 1, 0)
-	title.Position = UDim2.new(0, 15, 0, 0)
+	title.Size = UDim2.new(0, 200, 1, 0)
+	title.Position = UDim2.new(0, 20, 0, 0)
 	title.BackgroundTransparency = 1
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextTransparency = 1
 	title.Parent = header
 	
 	local closeButton = Instance.new("TextButton")
 	closeButton.Text = "×"
 	closeButton.Font = Enum.Font.GothamBold
-	closeButton.TextSize = 20
+	closeButton.TextSize = 24
 	closeButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-	closeButton.Size = UDim2.new(0, 30, 0, 40)
-	closeButton.Position = UDim2.new(1, -30, 0, 0)
+	closeButton.Size = UDim2.new(0, 40, 0, 50)
+	closeButton.Position = UDim2.new(1, -40, 0, 0)
 	closeButton.BackgroundTransparency = 1
-	closeButton.TextTransparency = 1
 	closeButton.Parent = header
 	
 	local separator = Instance.new("Frame")
 	separator.Size = UDim2.new(1, 0, 0, 1)
-	separator.Position = UDim2.new(0, 0, 0, 40)
-	separator.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	separator.Position = UDim2.new(0, 0, 0, 50)
+	separator.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	separator.BorderSizePixel = 0
-	separator.BackgroundTransparency = 1
 	separator.Parent = mainFrame
 	
-	local scrollingFrame = Instance.new("ScrollingFrame")
-	scrollingFrame.Size = UDim2.new(1, 0, 1, -80)
-	scrollingFrame.Position = UDim2.new(0, 0, 0, 41)
-	scrollingFrame.BackgroundTransparency = 1
-	scrollingFrame.BorderSizePixel = 0
-	scrollingFrame.ScrollBarThickness = 2
-	scrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
-	scrollingFrame.ScrollBarImageTransparency = 1
-	scrollingFrame.Parent = mainFrame
+	-- Toolbar
+	local toolbar = Instance.new("Frame")
+	toolbar.Name = "Toolbar"
+	toolbar.Size = UDim2.new(1, 0, 0, 40)
+	toolbar.Position = UDim2.new(0, 0, 0, 51)
+	toolbar.BackgroundTransparency = 1
+	toolbar.Parent = mainFrame
 	
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Padding = UDim.new(0, 4)
-	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	listLayout.Parent = scrollingFrame
-	
-	local listPadding = Instance.new("UIPadding")
-	listPadding.PaddingTop = UDim.new(0, 8)
-	listPadding.PaddingBottom = UDim.new(0, 8)
-	listPadding.Parent = scrollingFrame
-	
-	local bottomBar = Instance.new("Frame")
-	bottomBar.Size = UDim2.new(1, 0, 0, 40)
-	bottomBar.Position = UDim2.new(0, 0, 1, -40)
-	bottomBar.BackgroundTransparency = 1
-	bottomBar.Parent = mainFrame
-	
-	local bottomSeparator = Instance.new("Frame")
-	bottomSeparator.Size = UDim2.new(1, 0, 0, 1)
-	bottomSeparator.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	bottomSeparator.BorderSizePixel = 0
-	bottomSeparator.BackgroundTransparency = 1
-	bottomSeparator.Parent = bottomBar
-	
-	local function createButton(text, pos, width, color)
+	local function createToolButton(text, icon, layoutOrder)
 		local btn = Instance.new("TextButton")
 		btn.Text = text
-		btn.Size = UDim2.new(0, width, 0, 24)
-		btn.Position = pos
-		btn.BackgroundColor3 = color or Color3.fromRGB(30, 30, 30)
-		btn.BackgroundTransparency = 1
 		btn.Font = Enum.Font.GothamMedium
-		btn.TextSize = 12
+		btn.TextSize = 14
 		btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-		btn.TextTransparency = 1
-		btn.Parent = bottomBar
+		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		btn.BackgroundTransparency = 0.5
+		btn.Size = UDim2.new(0, 100, 0, 30)
+		btn.LayoutOrder = layoutOrder
 		
 		local c = Instance.new("UICorner")
 		c.CornerRadius = UDim.new(0, 6)
 		c.Parent = btn
 		
-		local s = Instance.new("UIStroke")
-		s.Color = Color3.fromRGB(60, 60, 60)
-		s.Thickness = 1
-		s.Transparency = 1
-		s.Parent = btn
-		
-		return btn, s
+		return btn
 	end
 	
-	local addButton, addStroke = createButton("Add Command", UDim2.new(0, 15, 0, 8), 100, Color3.fromRGB(40, 40, 40))
-	local refreshButton, refreshStroke = createButton("Refresh", UDim2.new(1, -85, 0, 8), 70)
+	local toolbarLayout = Instance.new("UIListLayout")
+	toolbarLayout.FillDirection = Enum.FillDirection.Horizontal
+	toolbarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	toolbarLayout.Padding = UDim.new(0, 10)
+	toolbarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	toolbarLayout.Parent = toolbar
 	
-	local gameFolderBtn, gameFolderStroke = createButton("Game Folder", UDim2.new(0, 125, 0, 8), 100, Color3.fromRGB(40, 40, 60))
+	local toolbarPadding = Instance.new("UIPadding")
+	toolbarPadding.PaddingLeft = UDim.new(0, 20)
+	toolbarPadding.PaddingTop = UDim.new(0, 5)
+	toolbarPadding.Parent = toolbar
 	
+	local switchViewBtn = createToolButton("Global", nil, 1)
+	switchViewBtn.Size = UDim2.new(0, 120, 0, 30)
+	switchViewBtn.Parent = toolbar
+	
+	local addBtn = createToolButton("New File", nil, 2)
+	addBtn.Parent = toolbar
+	
+	local refreshBtn = createToolButton("Refresh", nil, 3)
+	refreshBtn.Parent = toolbar
+	
+	-- Content Area
+	local contentArea = Instance.new("ScrollingFrame")
+	contentArea.Name = "ContentArea"
+	contentArea.Size = UDim2.new(1, 0, 1, -100)
+	contentArea.Position = UDim2.new(0, 0, 0, 95)
+	contentArea.BackgroundTransparency = 1
+	contentArea.BorderSizePixel = 0
+	contentArea.ScrollBarThickness = 4
+	contentArea.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+	contentArea.Parent = mainFrame
+	
+	local gridLayout = Instance.new("UIGridLayout")
+	gridLayout.CellSize = UDim2.new(0, 90, 0, 100)
+	gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
+	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	gridLayout.Parent = contentArea
+	
+	local contentPadding = Instance.new("UIPadding")
+	contentPadding.PaddingLeft = UDim.new(0, 20)
+	contentPadding.PaddingTop = UDim.new(0, 20)
+	contentPadding.PaddingRight = UDim.new(0, 20)
+	contentPadding.Parent = contentArea
+	
+	-- Editor
 	local editorFrame = Instance.new("Frame")
 	editorFrame.Name = "Editor"
 	editorFrame.Size = UDim2.new(1, 0, 1, 0)
-	editorFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	editorFrame.BackgroundTransparency = 0
+	editorFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 	editorFrame.Visible = false
 	editorFrame.Parent = mainFrame
 	
+	local editorHeader = Instance.new("Frame")
+	editorHeader.Size = UDim2.new(1, 0, 0, 40)
+	editorHeader.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	editorHeader.BorderSizePixel = 0
+	editorHeader.Parent = editorFrame
+	
 	local editorTitle = Instance.new("TextLabel")
-	editorTitle.Text = "Edit Command"
+	editorTitle.Text = "Editing: script.luau"
 	editorTitle.Font = Enum.Font.GothamBold
-	editorTitle.TextSize = 16
+	editorTitle.TextSize = 14
 	editorTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
-	editorTitle.Size = UDim2.new(1, -40, 0, 40)
+	editorTitle.Size = UDim2.new(1, -220, 1, 0)
 	editorTitle.Position = UDim2.new(0, 15, 0, 0)
 	editorTitle.BackgroundTransparency = 1
 	editorTitle.TextXAlignment = Enum.TextXAlignment.Left
-	editorTitle.Parent = editorFrame
+	editorTitle.Parent = editorHeader
 	
-	local configLabel = Instance.new("TextLabel")
-	configLabel.Text = "Configuration (module.Name = ...)"
-	configLabel.Font = Enum.Font.GothamBold
-	configLabel.TextSize = 12
-	configLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-	configLabel.Size = UDim2.new(1, -30, 0, 20)
-	configLabel.Position = UDim2.new(0, 15, 0, 40)
-	configLabel.BackgroundTransparency = 1
-	configLabel.TextXAlignment = Enum.TextXAlignment.Left
-	configLabel.Parent = editorFrame
+	local saveBtn = Instance.new("TextButton")
+	saveBtn.Text = "Save"
+	saveBtn.Size = UDim2.new(0, 60, 0, 24)
+	saveBtn.Position = UDim2.new(1, -210, 0, 8)
+	saveBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+	saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	saveBtn.Font = Enum.Font.GothamBold
+	saveBtn.TextSize = 12
+	saveBtn.Parent = editorHeader
+	Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 4)
+	
+	local deleteBtn = Instance.new("TextButton")
+	deleteBtn.Text = "Delete"
+	deleteBtn.Size = UDim2.new(0, 60, 0, 24)
+	deleteBtn.Position = UDim2.new(1, -140, 0, 8)
+	deleteBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+	deleteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	deleteBtn.Font = Enum.Font.GothamBold
+	deleteBtn.TextSize = 12
+	deleteBtn.Parent = editorHeader
+	Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0, 4)
 
-	local configInput = Instance.new("TextBox")
-	configInput.PlaceholderText = "-- Paste your configuration here\nmodule.Name = \"example\"\nmodule.Args = \"...\""
-	configInput.Size = UDim2.new(1, -30, 0, 140)
-	configInput.Position = UDim2.new(0, 15, 0, 60)
-	configInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	configInput.TextColor3 = Color3.fromRGB(220, 220, 220)
-	configInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
-	configInput.Font = Enum.Font.Code
-	configInput.TextSize = 13
-	configInput.TextXAlignment = Enum.TextXAlignment.Left
-	configInput.TextYAlignment = Enum.TextYAlignment.Top
-	configInput.ClearTextOnFocus = false
-	configInput.MultiLine = true
-	configInput.Parent = editorFrame
+	local closeEditorBtn = Instance.new("TextButton")
+	closeEditorBtn.Text = "Close"
+	closeEditorBtn.Size = UDim2.new(0, 60, 0, 24)
+	closeEditorBtn.Position = UDim2.new(1, -70, 0, 8)
+	closeEditorBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	closeEditorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeEditorBtn.Font = Enum.Font.GothamBold
+	closeEditorBtn.TextSize = 12
+	closeEditorBtn.Parent = editorHeader
+	Instance.new("UICorner", closeEditorBtn).CornerRadius = UDim.new(0, 4)
 	
-	Instance.new("UICorner", configInput).CornerRadius = UDim.new(0, 6)
-	local cp = Instance.new("UIPadding")
-	cp.PaddingLeft = UDim.new(0, 10)
-	cp.PaddingTop = UDim.new(0, 10)
-	cp.Parent = configInput
-
-	local callbackLabel = Instance.new("TextLabel")
-	callbackLabel.Text = "Callback (function(args) ... end)"
-	callbackLabel.Font = Enum.Font.GothamBold
-	callbackLabel.TextSize = 12
-	callbackLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-	callbackLabel.Size = UDim2.new(1, -30, 0, 20)
-	callbackLabel.Position = UDim2.new(0, 15, 0, 210)
-	callbackLabel.BackgroundTransparency = 1
-	callbackLabel.TextXAlignment = Enum.TextXAlignment.Left
-	callbackLabel.Parent = editorFrame
-
-	local callbackInput = Instance.new("TextBox")
-	callbackInput.PlaceholderText = "-- Write your callback code here\nprint(args[1])"
-	callbackInput.Size = UDim2.new(1, -30, 0, 140)
-	callbackInput.Position = UDim2.new(0, 15, 0, 230)
-	callbackInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	callbackInput.TextColor3 = Color3.fromRGB(220, 220, 220)
-	callbackInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
-	callbackInput.Font = Enum.Font.Code
-	callbackInput.TextSize = 13
-	callbackInput.TextXAlignment = Enum.TextXAlignment.Left
-	callbackInput.TextYAlignment = Enum.TextYAlignment.Top
-	callbackInput.ClearTextOnFocus = false
-	callbackInput.MultiLine = true
-	callbackInput.Parent = editorFrame
+	local editorInput = Instance.new("TextBox")
+	editorInput.Size = UDim2.new(1, -20, 1, -60)
+	editorInput.Position = UDim2.new(0, 10, 0, 50)
+	editorInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	editorInput.TextColor3 = Color3.fromRGB(220, 220, 220)
+	editorInput.Font = Enum.Font.Code
+	editorInput.TextSize = 14
+	editorInput.TextXAlignment = Enum.TextXAlignment.Left
+	editorInput.TextYAlignment = Enum.TextYAlignment.Top
+	editorInput.ClearTextOnFocus = false
+	editorInput.MultiLine = true
+	editorInput.Parent = editorFrame
 	
-	Instance.new("UICorner", callbackInput).CornerRadius = UDim.new(0, 6)
-	local cbp = Instance.new("UIPadding")
-	cbp.PaddingLeft = UDim.new(0, 10)
-	cbp.PaddingTop = UDim.new(0, 10)
-	cbp.Parent = callbackInput
+	Instance.new("UICorner", editorInput).CornerRadius = UDim.new(0, 6)
+	local ep = Instance.new("UIPadding")
+	ep.PaddingLeft = UDim.new(0, 10)
+	ep.PaddingTop = UDim.new(0, 10)
+	ep.Parent = editorInput
 	
-	local saveButton = Instance.new("TextButton")
-	saveButton.Text = "Save"
-	saveButton.Size = UDim2.new(0, 80, 0, 25)
-	saveButton.Position = UDim2.new(1, -95, 1, -35)
-	saveButton.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
-	saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	saveButton.Font = Enum.Font.GothamBold
-	saveButton.TextSize = 12
-	saveButton.Parent = editorFrame
-	Instance.new("UICorner", saveButton).CornerRadius = UDim.new(0, 6)
-	
-	local cancelEditButton = Instance.new("TextButton")
-	cancelEditButton.Text = "Cancel"
-	cancelEditButton.Size = UDim2.new(0, 80, 0, 25)
-	cancelEditButton.Position = UDim2.new(1, -185, 1, -35)
-	cancelEditButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-	cancelEditButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	cancelEditButton.Font = Enum.Font.GothamBold
-	cancelEditButton.TextSize = 12
-	cancelEditButton.Parent = editorFrame
-	Instance.new("UICorner", cancelEditButton).CornerRadius = UDim.new(0, 6)
-	
+	-- Logic Variables
 	local isGameSpecificView = false
+	local currentEditingFile = nil
+	local currentEditingName = nil
 	
+	-- Functions
 	local function populateList()
-		for _, child in ipairs(scrollingFrame:GetChildren()) do
-			if child:IsA("Frame") then child:Destroy() end
+		for _, child in ipairs(contentArea:GetChildren()) do
+			if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
 		end
 		
 		local targetFolder = isGameSpecificView and getGameFolder() or GLOBAL_FOLDER
 		local cmds = listCommands(targetFolder)
 		
 		for _, cmd in ipairs(cmds) do
-			local item = Instance.new("Frame")
-			item.Size = UDim2.new(1, -20, 0, 40)
-			item.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			item.BackgroundTransparency = 0
-			item.Parent = scrollingFrame
-			Instance.new("UICorner", item).CornerRadius = UDim.new(0, 6)
+			local fileBtn = Instance.new("TextButton")
+			fileBtn.Name = cmd.FileName
+			fileBtn.Text = ""
+			fileBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			fileBtn.BackgroundTransparency = 1
+			fileBtn.Parent = contentArea
+			
+			local iconFrame = Instance.new("Frame")
+			iconFrame.Size = UDim2.new(0, 50, 0, 60)
+			iconFrame.Position = UDim2.new(0.5, -25, 0, 10)
+			iconFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+			iconFrame.BorderSizePixel = 0
+			iconFrame.Parent = fileBtn
+			
+			local iconCorner = Instance.new("UICorner")
+			iconCorner.CornerRadius = UDim.new(0, 4)
+			iconCorner.Parent = iconFrame
+			
+			local iconFold = Instance.new("Frame")
+			iconFold.Size = UDim2.new(0, 15, 0, 15)
+			iconFold.Position = UDim2.new(1, -15, 0, 0)
+			iconFold.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			iconFold.BorderSizePixel = 0
+			iconFold.Parent = iconFrame
+			
+			local foldGradient = Instance.new("UIGradient")
+			foldGradient.Rotation = 45
+			foldGradient.Transparency = NumberSequence.new{
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(0.5, 0),
+				NumberSequenceKeypoint.new(0.51, 1),
+				NumberSequenceKeypoint.new(1, 1)
+			}
+			foldGradient.Parent = iconFold
+			
+			local iconLabel = Instance.new("TextLabel")
+			iconLabel.Text = "LUA"
+			iconLabel.Size = UDim2.new(1, 0, 1, 0)
+			iconLabel.BackgroundTransparency = 1
+			iconLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+			iconLabel.Font = Enum.Font.GothamBold
+			iconLabel.TextSize = 12
+			iconLabel.Parent = iconFrame
 			
 			local nameLabel = Instance.new("TextLabel")
-			nameLabel.Text = cmd.Name
-			nameLabel.Font = Enum.Font.GothamBold
-			nameLabel.TextSize = 14
-			nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-			nameLabel.Size = UDim2.new(0, 150, 1, 0)
-			nameLabel.Position = UDim2.new(0, 10, 0, 0)
+			nameLabel.Text = cmd.Name -- Use internal name if available
+			nameLabel.Size = UDim2.new(1, 0, 0, 20)
+			nameLabel.Position = UDim2.new(0, 0, 1, -20)
 			nameLabel.BackgroundTransparency = 1
-			nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-			nameLabel.Parent = item
+			nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+			nameLabel.Font = Enum.Font.Gotham
+			nameLabel.TextSize = 12
+			nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+			nameLabel.Parent = fileBtn
 			
-			local delBtn = Instance.new("TextButton")
-			delBtn.Text = "Delete"
-			delBtn.Size = UDim2.new(0, 50, 0, 24)
-			delBtn.Position = UDim2.new(1, -60, 0, 8)
-			delBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-			delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			delBtn.Font = Enum.Font.Gotham
-			delBtn.TextSize = 11
-			delBtn.Parent = item
-			Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
-			
-			delBtn.MouseButton1Click:Connect(function()
-				deleteCommand(cmd.Name, isGameSpecificView)
-				populateList()
-			end)
-			
-			local editBtn = Instance.new("TextButton")
-			editBtn.Text = "Edit"
-			editBtn.Size = UDim2.new(0, 50, 0, 24)
-			editBtn.Position = UDim2.new(1, -120, 0, 8)
-			editBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 150)
-			editBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			editBtn.Font = Enum.Font.Gotham
-			editBtn.TextSize = 11
-			editBtn.Parent = item
-			Instance.new("UICorner", editBtn).CornerRadius = UDim.new(0, 4)
-			
-			editBtn.MouseButton1Click:Connect(function()
-				local content = readfile(cmd.Path)
-				
-				local configPart = ""
-				local callbackPart = ""
-				
-				local callbackStart = content:find("module.Callback%s*=%s*function")
-				if callbackStart then
-					configPart = content:sub(1, callbackStart - 1)
-					configPart = configPart:gsub("local module = {}", ""):gsub("^%s+", "")
-					
-					local callbackEnd = content:find("end%s*}$") or content:find("end%s*$")
-					if callbackEnd then
-						local bodyStart = content:find("%)", callbackStart)
-						if bodyStart then
-							callbackPart = content:sub(bodyStart + 1, callbackEnd - 1)
-							callbackPart = callbackPart:gsub("^%s+", ""):gsub("%s+$", "")
-						end
-					end
-				else
-					configPart = content
-				end
-				
-				configInput.Text = configPart
-				callbackInput.Text = callbackPart
-				
+			-- Interaction: Single Click to Edit
+			fileBtn.MouseButton1Click:Connect(function()
+				currentEditingFile = cmd.FileName
+				currentEditingName = cmd.Name
+				editorTitle.Text = "Editing: " .. cmd.Name
+				editorInput.Text = readfile(cmd.Path)
 				editorFrame.Visible = true
 			end)
 		end
 		
-		scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #cmds * 44 + 10)
+		local rows = math.ceil(#cmds / 5)
+		contentArea.CanvasSize = UDim2.new(0, 0, 0, rows * 110 + 20)
 	end
 	
-	gameFolderBtn.MouseButton1Click:Connect(function()
+	-- Event Connections
+	
+	switchViewBtn.MouseButton1Click:Connect(function()
 		isGameSpecificView = not isGameSpecificView
-		
 		if isGameSpecificView then
 			local MarketplaceService = game:GetService("MarketplaceService")
 			local success, info = pcall(function()
 				return MarketplaceService:GetProductInfo(game.PlaceId)
 			end)
 			local gameName = success and info.Name or "Unknown Game"
-			
-			gameFolderBtn.Text = "View: " .. gameName
-			gameFolderBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-			title.Text = "External Commands (" .. gameName .. ")"
+			switchViewBtn.Text = "Game: " .. gameName
+			switchViewBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+			title.Text = "File Explorer (" .. gameName .. ")"
 		else
-			gameFolderBtn.Text = "Game Folder"
-			gameFolderBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-			title.Text = "External Commands (Global)"
+			switchViewBtn.Text = "Global"
+			switchViewBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+			title.Text = "File Explorer (Global)"
 		end
-		
 		populateList()
 	end)
 	
-	addButton.MouseButton1Click:Connect(function()
-		configInput.Text = "module.Name = \"example\"\nmodule.Args = \"<arg1>\"\nmodule.Description = \"Description\""
-		callbackInput.Text = "print(\"Hello World\")"
+	addBtn.MouseButton1Click:Connect(function()
+		local defaultName = "NewCommand"
+		local counter = 1
+		local targetFolder = isGameSpecificView and getGameFolder() or GLOBAL_FOLDER
+		
+		while isfile(targetFolder .. "/" .. defaultName .. ".luau") do
+			defaultName = "NewCommand" .. counter
+			counter = counter + 1
+		end
+		
+		local template = [[local module = {}
+
+module.Name = "]] .. defaultName .. [["
+module.Args = "<args>"
+module.Description = "A new command"
+module.Aliases = ""
+
+module.Callback = function(args)
+    print("Hello from " .. module.Name)
+end
+
+return module]]
+		
+		saveCommand(defaultName, template, isGameSpecificView)
+		populateList()
+		
+		currentEditingFile = defaultName .. ".luau"
+		editorTitle.Text = "Editing: " .. defaultName
+		editorInput.Text = template
 		editorFrame.Visible = true
 	end)
 	
-	refreshButton.MouseButton1Click:Connect(populateList)
+	refreshBtn.MouseButton1Click:Connect(populateList)
 	
-	cancelEditButton.MouseButton1Click:Connect(function()
+	saveBtn.MouseButton1Click:Connect(function()
+		if currentEditingFile then
+			saveCommand(currentEditingFile, editorInput.Text, isGameSpecificView)
+			editorFrame.Visible = false
+			populateList()
+		end
+	end)
+	
+	deleteBtn.MouseButton1Click:Connect(function()
+		if currentEditingFile then
+			deleteCommand(currentEditingFile, isGameSpecificView)
+			editorFrame.Visible = false
+			populateList()
+		end
+	end)
+	
+	closeEditorBtn.MouseButton1Click:Connect(function()
 		editorFrame.Visible = false
 	end)
 	
-	saveButton.MouseButton1Click:Connect(function()
-		local config = configInput.Text
-		local callback = callbackInput.Text
-		
-		local name = config:match('module.Name%s*=%s*"([^"]+)"')
-		if not name then
-			name = config:match("module.Name%s*=%s*'([^']+)'")
-		end
-		
-		if not name then
-			warn("Could not find module.Name in config")
-			return 
-		end
-		
-		local fileContent = string.format([[local module = {}
-
-%s
-
-module.Callback = function(args)
-%s
-end
-
-return module]], config, callback)
-
-		saveCommand(name, fileContent, isGameSpecificView)
-		editorFrame.Visible = false
-		populateList()
+	closeButton.MouseButton1Click:Connect(function()
+		module.Toggle()
 	end)
 	
+	-- Toggle Logic
 	local function toggle(state)
 		if state then
 			populateList()
 			screenGui.Enabled = true
 			TweenService:Create(mainFrame, TweenInfoOpen, {BackgroundTransparency = 0.1}):Play()
-			TweenService:Create(uiStroke, TweenInfoOpen, {Transparency = 0}):Play()
-			TweenService:Create(title, TweenInfoOpen, {TextTransparency = 0}):Play()
-			TweenService:Create(closeButton, TweenInfoOpen, {TextTransparency = 0}):Play()
-			TweenService:Create(separator, TweenInfoOpen, {BackgroundTransparency = 0}):Play()
-			TweenService:Create(bottomSeparator, TweenInfoOpen, {BackgroundTransparency = 0}):Play()
-			
-			TweenService:Create(addButton, TweenInfoOpen, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-			TweenService:Create(addStroke, TweenInfoOpen, {Transparency = 0}):Play()
-			TweenService:Create(gameFolderBtn, TweenInfoOpen, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-			TweenService:Create(gameFolderStroke, TweenInfoOpen, {Transparency = 0}):Play()
-			TweenService:Create(refreshButton, TweenInfoOpen, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-			TweenService:Create(refreshStroke, TweenInfoOpen, {Transparency = 0}):Play()
-			
-			TweenService:Create(scrollingFrame, TweenInfoOpen, {ScrollBarImageTransparency = 0}):Play()
+			TweenService:Create(uiStroke, TweenInfoOpen, {Transparency = 0.5}):Play()
 		else
 			local t = TweenService:Create(mainFrame, TweenInfoClose, {BackgroundTransparency = 1})
 			t:Play()
 			TweenService:Create(uiStroke, TweenInfoClose, {Transparency = 1}):Play()
-			TweenService:Create(title, TweenInfoClose, {TextTransparency = 1}):Play()
-			TweenService:Create(closeButton, TweenInfoClose, {TextTransparency = 1}):Play()
-			TweenService:Create(separator, TweenInfoClose, {BackgroundTransparency = 1}):Play()
-			TweenService:Create(bottomSeparator, TweenInfoClose, {BackgroundTransparency = 1}):Play()
-			
-			TweenService:Create(addButton, TweenInfoClose, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-			TweenService:Create(addStroke, TweenInfoClose, {Transparency = 1}):Play()
-			TweenService:Create(gameFolderBtn, TweenInfoClose, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-			TweenService:Create(gameFolderStroke, TweenInfoClose, {Transparency = 1}):Play()
-			TweenService:Create(refreshButton, TweenInfoClose, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-			TweenService:Create(refreshStroke, TweenInfoClose, {Transparency = 1}):Play()
-			
-			TweenService:Create(scrollingFrame, TweenInfoClose, {ScrollBarImageTransparency = 1}):Play()
-			
 			t.Completed:Connect(function()
 				if mainFrame.BackgroundTransparency == 1 then
 					screenGui.Enabled = false
@@ -525,8 +497,6 @@ return module]], config, callback)
 			end)
 		end
 	end
-	
-	closeButton.MouseButton1Click:Connect(function() toggle(false) end)
 	
 	function module.Toggle()
 		if screenGui.Enabled and mainFrame.BackgroundTransparency < 0.5 then

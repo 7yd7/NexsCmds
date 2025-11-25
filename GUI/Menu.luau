@@ -307,7 +307,7 @@ function module.GUI()
                 suggestionType = "Player"
             end
 
-            if suggestionType == "Player" then
+            local function addPlayerSuggestions()
                 for _, player in ipairs(Players:GetPlayers()) do
                     if count >= 5 then break end
                     if player == LocalPlayer then continue end
@@ -321,14 +321,27 @@ function module.GUI()
                         count = count + 1
                     end
                 end
+            end
+
+            local function addStringSuggestion(item)
+                if count >= 5 then return end
+                if string.find(string.lower(item), string.lower(currentArg)) then
+                    createSuggestionItem(item, "Suggestion", "", item)
+                    table.insert(currentSuggestions, item)
+                    count = count + 1
+                end
+            end
+
+            if suggestionType == "Player" then
+                addPlayerSuggestions()
             elseif type(suggestionType) == "table" then
                 for _, item in ipairs(suggestionType) do
-                    if count >= 5 then break end
-                    if string.find(string.lower(item), string.lower(currentArg)) then
-                        createSuggestionItem(item, "Suggestion", "", item)
-                        table.insert(currentSuggestions, item)
-                        count = count + 1
+                    if item == "Player" then
+                        addPlayerSuggestions()
+                    else
+                        addStringSuggestion(item)
                     end
+                    if count >= 5 then break end
                 end
             end
         else
