@@ -182,7 +182,7 @@ function module.GUI()
 		label.TextSize = 14
 		label.TextColor3 = Color3.fromRGB(255, 200, 100)
 		label.Text = text
-		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextXAlignment = Enum.TextXAlignment.Center
 		label.TextTransparency = 1
 		label.Parent = scrollingFrame
 	end
@@ -238,12 +238,14 @@ function module.GUI()
 		local count = 0
 		
 		if #gameCmds > 0 then
-			local success, info = pcall(function()
-				return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
-			end)
-			local gameName = success and info.Name or "Game Specific"
+			if not module.cachedGameName then
+				local success, info = pcall(function()
+					return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+				end)
+				module.cachedGameName = success and info.Name or "Game Specific"
+			end
 			
-			createHeaderLabel(gameName)
+			createHeaderLabel(module.cachedGameName)
 			count = count + 1
 			for _, name in ipairs(gameCmds) do
 				createItem(name, module.Commands[name].Aliases)

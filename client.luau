@@ -43,6 +43,7 @@ end
 
 local GUIMenu = import("GUI/Menu.luau")
 local GUICommands = import("GUI/Commands.luau")
+getgenv().Nexs_GUICommands = GUICommands
 local Notifications = import("GUI/notifications.luau")
 getgenv().NexsNotifications = Notifications
 
