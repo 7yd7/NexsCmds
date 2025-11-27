@@ -13,6 +13,22 @@ local OpenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection
 local CloseInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, suggestions, argsCustomColors)
+    -- Validation Checks
+    if type(name) ~= "string" or name == "" then
+        warn("[NexsCmds] Failed to register command: Invalid name")
+        return
+    end
+
+    if type(callback) ~= "function" then
+        warn("[NexsCmds] Failed to register command '" .. name .. "': Invalid callback (function expected)")
+        return
+    end
+
+    -- Default Values for Optional Fields
+    if type(args) ~= "string" then args = "" end
+    if type(desc) ~= "string" then desc = "No description provided" end
+    if type(aliases) ~= "string" then aliases = "" end
+
     module.Commands[name] = {
         Args = args,
         Desc = desc,
@@ -307,7 +323,7 @@ function module.GUI()
                 suggestionType = "Player"
             end
 
-            local function addPlayerSuggestions()
+            if suggestionType == "Player" then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if count >= 5 then break end
                     if player == LocalPlayer then continue end
@@ -321,27 +337,14 @@ function module.GUI()
                         count = count + 1
                     end
                 end
-            end
-
-            local function addStringSuggestion(item)
-                if count >= 5 then return end
-                if string.find(string.lower(item), string.lower(currentArg)) then
-                    createSuggestionItem(item, "Suggestion", "", item)
-                    table.insert(currentSuggestions, item)
-                    count = count + 1
-                end
-            end
-
-            if suggestionType == "Player" then
-                addPlayerSuggestions()
             elseif type(suggestionType) == "table" then
                 for _, item in ipairs(suggestionType) do
-                    if item == "Player" then
-                        addPlayerSuggestions()
-                    else
-                        addStringSuggestion(item)
-                    end
                     if count >= 5 then break end
+                    if string.find(string.lower(item), string.lower(currentArg)) then
+                        createSuggestionItem(item, "Suggestion", "", item)
+                        table.insert(currentSuggestions, item)
+                        count = count + 1
+                    end
                 end
             end
         else
