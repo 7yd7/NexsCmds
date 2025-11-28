@@ -25,7 +25,7 @@ function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, 
     end
 
     -- Default Values for Optional Fields
-    if type(args) ~= "string" then args = "" end
+    if type(args) ~= "string" and type(args) ~= "table" then args = "" end
     if type(desc) ~= "string" then desc = "No description provided" end
     if type(aliases) ~= "string" then aliases = "" end
 
@@ -163,12 +163,20 @@ function module.GUI()
 
         local displayName = name
         if not string.find(name, "<font") then
-            displayName = string.format('<font color="#E0E0E0">%s</font>', name:gsub("<", "&lt;"):gsub(">", "&gt;"))
+            displayName = string.format('<font color="#E0E0E0">%s</font>', tostring(name):gsub("<", "&lt;"):gsub(">", "&gt;"))
         end
 
         local displayArgs = ""
-        if not string.find(args, "<font") then
-            local splitArgs = args:split(" ")
+        if type(args) == "string" and string.find(args, "<font") then
+             displayArgs = args
+        else
+            local splitArgs
+            if type(args) == "table" then
+                splitArgs = args
+            else
+                splitArgs = tostring(args):split(" ")
+            end
+
             for i, arg in ipairs(splitArgs) do
                 local colorHex = "#8DA5C9" 
                 
@@ -178,15 +186,14 @@ function module.GUI()
                     colorHex = "#" .. argsColor:ToHex()
                 end
                 
-                displayArgs = displayArgs .. string.format('<font color="%s">%s</font> ', colorHex, arg:gsub("<", "&lt;"):gsub(">", "&gt;"))
+                local argStr = tostring(arg)
+                displayArgs = displayArgs .. string.format('<font color="%s">%s</font> ', colorHex, argStr:gsub("<", "&lt;"):gsub(">", "&gt;"))
             end
-        else
-            displayArgs = args
         end
         
         titleLabel.Text = displayName .. " " .. displayArgs
         
-        titleLabel.Parent = itemFrame
+        titleLabel.Parent = itemFrame 
 
         local descLabel = Instance.new("TextLabel")
         descLabel.Name = "Desc"
