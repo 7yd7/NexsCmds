@@ -13,7 +13,6 @@ local OpenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection
 local CloseInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, suggestions, argsCustomColors)
-    -- Validation Checks
     if type(name) ~= "string" or name == "" then
         warn("[NexsCmds] Failed to register command: Invalid name")
         return
@@ -24,7 +23,6 @@ function module.RegisterCommand(name, args, desc, aliases, callback, argsColor, 
         return
     end
 
-    -- Default Values for Optional Fields
     if type(args) ~= "string" and type(args) ~= "table" then args = "" end
     if type(desc) ~= "string" then desc = "No description provided" end
     if type(aliases) ~= "string" then aliases = "" end

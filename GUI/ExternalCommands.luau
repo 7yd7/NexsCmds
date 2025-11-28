@@ -14,6 +14,19 @@ local ROOT_FOLDER = "NexsCommands"
 local GLOBAL_FOLDER = ROOT_FOLDER .. "/Global"
 local GAMES_FOLDER = ROOT_FOLDER .. "/Games"
 
+local ICONS = {
+	Add = "rbxassetid://17544384647",
+	Game = "rbxassetid://94953827000248",
+	Refresh = "rbxassetid://82068432966618",
+	Back = "rbxassetid://93111945058621",
+	Clear = "rbxassetid://102910221413931",
+	Delete = "rbxassetid://131197451603952",
+	Save = "rbxassetid://77826812844460",
+	Export = "rbxassetid://115295068143548",
+	Import = "rbxassetid://120380873978812",
+	Copy = "rbxassetid://130973468889534"
+}
+
 local function ensureFolders()
 	if not isfolder(ROOT_FOLDER) then makefolder(ROOT_FOLDER) end
 	if not isfolder(GLOBAL_FOLDER) then makefolder(GLOBAL_FOLDER) end
@@ -53,7 +66,6 @@ local function listCommands(targetFolder)
 			if file:sub(-5) == ".luau" then
 				local fileName = file:match("([^/\\]+)%.luau$")
 				local content = readfile(file)
-				-- Try to extract module.Name from content
 				local internalName = content:match('module%.Name%s*=%s*"([^"]+)"') or 
 									 content:match("module%.Name%s*=%s*'([^']+)'") or 
 									 fileName
@@ -109,14 +121,13 @@ function module.GUI()
 	screenGui.Parent = game.CoreGui
 	screenGui.Enabled = false
 	
-	-- Main Window
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 700, 0, 500)
+	mainFrame.Size = UDim2.new(0, 250, 0, 320)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	mainFrame.BackgroundTransparency = 0.1
+	mainFrame.BackgroundTransparency = 1 
 	mainFrame.BorderSizePixel = 0
 	mainFrame.ClipsDescendants = true
 	mainFrame.Parent = screenGui
@@ -128,295 +139,327 @@ function module.GUI()
 	local uiStroke = Instance.new("UIStroke")
 	uiStroke.Color = Color3.fromRGB(60, 60, 60)
 	uiStroke.Thickness = 1
-	uiStroke.Transparency = 0.5
+	uiStroke.Transparency = 1
 	uiStroke.Parent = mainFrame
 	
 	makeDraggable(mainFrame)
 	
-	-- Header
 	local header = Instance.new("Frame")
 	header.Name = "Header"
-	header.Size = UDim2.new(1, 0, 0, 50)
+	header.Size = UDim2.new(1, 0, 0, 35)
 	header.BackgroundTransparency = 1
 	header.Parent = mainFrame
 	
-	local title = Instance.new("TextLabel")
-	title.Text = "File Explorer"
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 18
-	title.TextColor3 = Color3.fromRGB(220, 220, 220)
-	title.Size = UDim2.new(0, 200, 1, 0)
-	title.Position = UDim2.new(0, 20, 0, 0)
-	title.BackgroundTransparency = 1
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = header
+	local backButton = Instance.new("ImageButton")
+	backButton.Name = "BackButton"
+	backButton.Size = UDim2.new(0, 25, 0, 25)
+	backButton.Position = UDim2.new(0, 5, 0, 5)
+	backButton.BackgroundTransparency = 1
+	backButton.Image = ICONS.Back
+	backButton.ImageColor3 = Color3.fromRGB(200, 200, 200)
+	backButton.Visible = false
+	backButton.Parent = header
+	
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "Title"
+	titleLabel.Size = UDim2.new(1, -70, 1, 0)
+	titleLabel.Position = UDim2.new(0, 10, 0, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = "External Cmds"
+	titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextSize = 14
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.TextTransparency = 1
+	titleLabel.Parent = header
 	
 	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.Size = UDim2.new(0, 25, 0, 35)
+	closeButton.Position = UDim2.new(1, -25, 0, 0)
+	closeButton.BackgroundTransparency = 1
 	closeButton.Text = "×"
 	closeButton.Font = Enum.Font.GothamBold
-	closeButton.TextSize = 24
-	closeButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-	closeButton.Size = UDim2.new(0, 40, 0, 50)
-	closeButton.Position = UDim2.new(1, -40, 0, 0)
-	closeButton.BackgroundTransparency = 1
+	closeButton.TextSize = 18
+	closeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+	closeButton.TextTransparency = 1
 	closeButton.Parent = header
 	
 	local separator = Instance.new("Frame")
 	separator.Size = UDim2.new(1, 0, 0, 1)
-	separator.Position = UDim2.new(0, 0, 0, 50)
+	separator.Position = UDim2.new(0, 0, 0, 35)
 	separator.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	separator.BorderSizePixel = 0
+	separator.BackgroundTransparency = 1
 	separator.Parent = mainFrame
 	
-	-- Toolbar
-	local toolbar = Instance.new("Frame")
-	toolbar.Name = "Toolbar"
-	toolbar.Size = UDim2.new(1, 0, 0, 40)
-	toolbar.Position = UDim2.new(0, 0, 0, 51)
-	toolbar.BackgroundTransparency = 1
-	toolbar.Parent = mainFrame
+	local contentContainer = Instance.new("Frame")
+	contentContainer.Name = "Content"
+	contentContainer.Size = UDim2.new(1, 0, 1, -36)
+	contentContainer.Position = UDim2.new(0, 0, 0, 36)
+	contentContainer.BackgroundTransparency = 1
+	contentContainer.Parent = mainFrame
 	
-	local function createToolButton(text, icon, layoutOrder)
-		local btn = Instance.new("TextButton")
-		btn.Text = text
-		btn.Font = Enum.Font.GothamMedium
-		btn.TextSize = 14
-		btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		btn.BackgroundTransparency = 0.5
-		btn.Size = UDim2.new(0, 100, 0, 30)
-		btn.LayoutOrder = layoutOrder
-		
-		local c = Instance.new("UICorner")
-		c.CornerRadius = UDim.new(0, 6)
-		c.Parent = btn
-		
+	local listView = Instance.new("Frame")
+	listView.Name = "ListView"
+	listView.Size = UDim2.new(1, 0, 1, 0)
+	listView.BackgroundTransparency = 1
+	listView.Visible = true
+	listView.Parent = contentContainer
+	
+	local fileList = Instance.new("ScrollingFrame")
+	fileList.Name = "FileList"
+	fileList.Size = UDim2.new(1, 0, 1, -40) 
+	fileList.BackgroundTransparency = 1
+	fileList.BorderSizePixel = 0
+	fileList.ScrollBarThickness = 2
+	fileList.Parent = listView
+	
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Padding = UDim.new(0, 5)
+	listLayout.Parent = fileList
+	
+	local listPadding = Instance.new("UIPadding")
+	listPadding.PaddingLeft = UDim.new(0, 10)
+	listPadding.PaddingTop = UDim.new(0, 10)
+	listPadding.PaddingRight = UDim.new(0, 10)
+	listPadding.Parent = fileList
+	
+	local listBottomBar = Instance.new("Frame")
+	listBottomBar.Size = UDim2.new(1, 0, 0, 40)
+	listBottomBar.Position = UDim2.new(0, 0, 1, -40)
+	listBottomBar.BackgroundTransparency = 1
+	listBottomBar.Parent = listView
+	
+	local listBarLayout = Instance.new("UIListLayout")
+	listBarLayout.FillDirection = Enum.FillDirection.Horizontal
+	listBarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	listBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	listBarLayout.Padding = UDim.new(0, 15)
+	listBarLayout.Parent = listBottomBar
+	
+	local function createIconBtn(parent, iconId, name)
+		local btn = Instance.new("ImageButton")
+		btn.Name = name
+		btn.Size = UDim2.new(0, 25, 0, 25)
+		btn.BackgroundTransparency = 1
+		btn.Image = iconId
+		btn.ImageColor3 = Color3.fromRGB(200, 200, 200)
+		btn.Parent = parent
 		return btn
 	end
 	
-	local toolbarLayout = Instance.new("UIListLayout")
-	toolbarLayout.FillDirection = Enum.FillDirection.Horizontal
-	toolbarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	toolbarLayout.Padding = UDim.new(0, 10)
-	toolbarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	toolbarLayout.Parent = toolbar
+	local addBtn = createIconBtn(listBottomBar, ICONS.Add, "AddBtn")
+	local gameBtn = createIconBtn(listBottomBar, ICONS.Game, "GameBtn")
+	local refreshBtn = createIconBtn(listBottomBar, ICONS.Refresh, "RefreshBtn")
+	local exportBtn = createIconBtn(listBottomBar, ICONS.Export, "ExportBtn")
+	local importBtn = createIconBtn(listBottomBar, ICONS.Import, "ImportBtn")
 	
-	local toolbarPadding = Instance.new("UIPadding")
-	toolbarPadding.PaddingLeft = UDim.new(0, 20)
-	toolbarPadding.PaddingTop = UDim.new(0, 5)
-	toolbarPadding.Parent = toolbar
-	
-	local switchViewBtn = createToolButton("Global", nil, 1)
-	switchViewBtn.Size = UDim2.new(0, 120, 0, 30)
-	switchViewBtn.Parent = toolbar
-	
-	local addBtn = createToolButton("New File", nil, 2)
-	addBtn.Parent = toolbar
-	
-	local refreshBtn = createToolButton("Refresh", nil, 3)
-	refreshBtn.Parent = toolbar
-	
-	-- Content Area
-	local contentArea = Instance.new("ScrollingFrame")
-	contentArea.Name = "ContentArea"
-	contentArea.Size = UDim2.new(1, 0, 1, -100)
-	contentArea.Position = UDim2.new(0, 0, 0, 95)
-	contentArea.BackgroundTransparency = 1
-	contentArea.BorderSizePixel = 0
-	contentArea.ScrollBarThickness = 4
-	contentArea.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-	contentArea.Parent = mainFrame
-	
-	local gridLayout = Instance.new("UIGridLayout")
-	gridLayout.CellSize = UDim2.new(0, 90, 0, 100)
-	gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
-	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	gridLayout.Parent = contentArea
-	
-	local contentPadding = Instance.new("UIPadding")
-	contentPadding.PaddingLeft = UDim.new(0, 20)
-	contentPadding.PaddingTop = UDim.new(0, 20)
-	contentPadding.PaddingRight = UDim.new(0, 20)
-	contentPadding.Parent = contentArea
-	
-	-- Editor
-	local editorFrame = Instance.new("Frame")
-	editorFrame.Name = "Editor"
-	editorFrame.Size = UDim2.new(1, 0, 1, 0)
-	editorFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	editorFrame.Visible = false
-	editorFrame.Parent = mainFrame
-	
-	local editorHeader = Instance.new("Frame")
-	editorHeader.Size = UDim2.new(1, 0, 0, 40)
-	editorHeader.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	editorHeader.BorderSizePixel = 0
-	editorHeader.Parent = editorFrame
-	
-	local editorTitle = Instance.new("TextLabel")
-	editorTitle.Text = "Editing: script.luau"
-	editorTitle.Font = Enum.Font.GothamBold
-	editorTitle.TextSize = 14
-	editorTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
-	editorTitle.Size = UDim2.new(1, -220, 1, 0)
-	editorTitle.Position = UDim2.new(0, 15, 0, 0)
-	editorTitle.BackgroundTransparency = 1
-	editorTitle.TextXAlignment = Enum.TextXAlignment.Left
-	editorTitle.Parent = editorHeader
-	
-	local saveBtn = Instance.new("TextButton")
-	saveBtn.Text = "Save"
-	saveBtn.Size = UDim2.new(0, 60, 0, 24)
-	saveBtn.Position = UDim2.new(1, -210, 0, 8)
-	saveBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
-	saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	saveBtn.Font = Enum.Font.GothamBold
-	saveBtn.TextSize = 12
-	saveBtn.Parent = editorHeader
-	Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 4)
-	
-	local deleteBtn = Instance.new("TextButton")
-	deleteBtn.Text = "Delete"
-	deleteBtn.Size = UDim2.new(0, 60, 0, 24)
-	deleteBtn.Position = UDim2.new(1, -140, 0, 8)
-	deleteBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-	deleteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	deleteBtn.Font = Enum.Font.GothamBold
-	deleteBtn.TextSize = 12
-	deleteBtn.Parent = editorHeader
-	Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0, 4)
-
-	local closeEditorBtn = Instance.new("TextButton")
-	closeEditorBtn.Text = "Close"
-	closeEditorBtn.Size = UDim2.new(0, 60, 0, 24)
-	closeEditorBtn.Position = UDim2.new(1, -70, 0, 8)
-	closeEditorBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-	closeEditorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	closeEditorBtn.Font = Enum.Font.GothamBold
-	closeEditorBtn.TextSize = 12
-	closeEditorBtn.Parent = editorHeader
-	Instance.new("UICorner", closeEditorBtn).CornerRadius = UDim.new(0, 4)
+	local editorView = Instance.new("Frame")
+	editorView.Name = "EditorView"
+	editorView.Size = UDim2.new(1, 0, 1, 0)
+	editorView.BackgroundTransparency = 1
+	editorView.Visible = false
+	editorView.Parent = contentContainer
 	
 	local editorInput = Instance.new("TextBox")
-	editorInput.Size = UDim2.new(1, -20, 1, -60)
-	editorInput.Position = UDim2.new(0, 10, 0, 50)
+	editorInput.Size = UDim2.new(1, -20, 1, -50)
+	editorInput.Position = UDim2.new(0, 10, 0, 10)
 	editorInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	editorInput.BackgroundTransparency = 0.5
 	editorInput.TextColor3 = Color3.fromRGB(220, 220, 220)
 	editorInput.Font = Enum.Font.Code
-	editorInput.TextSize = 14
+	editorInput.TextSize = 12
 	editorInput.TextXAlignment = Enum.TextXAlignment.Left
 	editorInput.TextYAlignment = Enum.TextYAlignment.Top
 	editorInput.ClearTextOnFocus = false
 	editorInput.MultiLine = true
-	editorInput.Parent = editorFrame
+	editorInput.Parent = editorView
 	
-	Instance.new("UICorner", editorInput).CornerRadius = UDim.new(0, 6)
-	local ep = Instance.new("UIPadding")
-	ep.PaddingLeft = UDim.new(0, 10)
-	ep.PaddingTop = UDim.new(0, 10)
-	ep.Parent = editorInput
+	local editorCorner = Instance.new("UICorner")
+	editorCorner.CornerRadius = UDim.new(0, 6)
+	editorCorner.Parent = editorInput
 	
-	-- Logic Variables
+	local editorPadding = Instance.new("UIPadding")
+	editorPadding.PaddingLeft = UDim.new(0, 5)
+	editorPadding.PaddingTop = UDim.new(0, 5)
+	editorPadding.Parent = editorInput
+	
+	local editorBottomBar = Instance.new("Frame")
+	editorBottomBar.Size = UDim2.new(1, 0, 0, 40)
+	editorBottomBar.Position = UDim2.new(0, 0, 1, -40)
+	editorBottomBar.BackgroundTransparency = 1
+	editorBottomBar.Parent = editorView
+	
+	local editorBarLayout = Instance.new("UIListLayout")
+	editorBarLayout.FillDirection = Enum.FillDirection.Horizontal
+	editorBarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	editorBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	editorBarLayout.Padding = UDim.new(0, 20)
+	editorBarLayout.Parent = editorBottomBar
+	
+	local clearBtn = createIconBtn(editorBottomBar, ICONS.Clear, "ClearBtn")
+	local deleteBtn = createIconBtn(editorBottomBar, ICONS.Delete, "DeleteBtn")
+	local saveBtn = createIconBtn(editorBottomBar, ICONS.Save, "SaveBtn")
+	
+	local exportView = Instance.new("Frame")
+	exportView.Name = "ExportView"
+	exportView.Size = UDim2.new(1, 0, 1, 0)
+	exportView.BackgroundTransparency = 1
+	exportView.Visible = false
+	exportView.Parent = contentContainer
+	
+	local exportInput = Instance.new("TextBox")
+	exportInput.Size = UDim2.new(1, -20, 1, -50)
+	exportInput.Position = UDim2.new(0, 10, 0, 10)
+	exportInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	exportInput.BackgroundTransparency = 0.5
+	exportInput.TextColor3 = Color3.fromRGB(220, 220, 220)
+	exportInput.Font = Enum.Font.Code
+	exportInput.TextSize = 10
+	exportInput.TextXAlignment = Enum.TextXAlignment.Left
+	exportInput.TextYAlignment = Enum.TextYAlignment.Top
+	exportInput.ClearTextOnFocus = false
+	exportInput.MultiLine = true
+	exportInput.TextEditable = false 
+	exportInput.Parent = exportView
+	
+	local exportCorner = Instance.new("UICorner")
+	exportCorner.CornerRadius = UDim.new(0, 6)
+	exportCorner.Parent = exportInput
+	
+	local exportBottomBar = Instance.new("Frame")
+	exportBottomBar.Size = UDim2.new(1, 0, 0, 40)
+	exportBottomBar.Position = UDim2.new(0, 0, 1, -40)
+	exportBottomBar.BackgroundTransparency = 1
+	exportBottomBar.Parent = exportView
+	
+	local exportBarLayout = Instance.new("UIListLayout")
+	exportBarLayout.FillDirection = Enum.FillDirection.Horizontal
+	exportBarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	exportBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	exportBarLayout.Parent = exportBottomBar
+	
+	local copyExportBtn = createIconBtn(exportBottomBar, ICONS.Copy, "CopyBtn")
+	
+	local importView = Instance.new("Frame")
+	importView.Name = "ImportView"
+	importView.Size = UDim2.new(1, 0, 1, 0)
+	importView.BackgroundTransparency = 1
+	importView.Visible = false
+	importView.Parent = contentContainer
+	
+	local importInput = Instance.new("TextBox")
+	importInput.Size = UDim2.new(1, -20, 1, -50)
+	importInput.Position = UDim2.new(0, 10, 0, 10)
+	importInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	importInput.BackgroundTransparency = 0.5
+	importInput.TextColor3 = Color3.fromRGB(220, 220, 220)
+	importInput.Font = Enum.Font.Code
+	importInput.TextSize = 10
+	importInput.TextXAlignment = Enum.TextXAlignment.Left
+	importInput.TextYAlignment = Enum.TextYAlignment.Top
+	importInput.ClearTextOnFocus = false
+	importInput.MultiLine = true
+	importInput.PlaceholderText = "Paste JSON here..."
+	importInput.Parent = importView
+	
+	local importCorner = Instance.new("UICorner")
+	importCorner.CornerRadius = UDim.new(0, 6)
+	importCorner.Parent = importInput
+	
+	local importBottomBar = Instance.new("Frame")
+	importBottomBar.Size = UDim2.new(1, 0, 0, 40)
+	importBottomBar.Position = UDim2.new(0, 0, 1, -40)
+	importBottomBar.BackgroundTransparency = 1
+	importBottomBar.Parent = importView
+	
+	local importBarLayout = Instance.new("UIListLayout")
+	importBarLayout.FillDirection = Enum.FillDirection.Horizontal
+	importBarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	importBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	importBarLayout.Parent = importBottomBar
+	
+	local saveImportBtn = createIconBtn(importBottomBar, ICONS.Save, "SaveImportBtn")
+	
+	
 	local isGameSpecificView = false
 	local currentEditingFile = nil
 	local currentEditingName = nil
 	
-	-- Functions
 	local function populateList()
-		for _, child in ipairs(contentArea:GetChildren()) do
-			if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+		for _, child in ipairs(fileList:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
 		end
 		
 		local targetFolder = isGameSpecificView and getGameFolder() or GLOBAL_FOLDER
 		local cmds = listCommands(targetFolder)
 		
 		for _, cmd in ipairs(cmds) do
-			local fileBtn = Instance.new("TextButton")
-			fileBtn.Name = cmd.FileName
-			fileBtn.Text = ""
-			fileBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-			fileBtn.BackgroundTransparency = 1
-			fileBtn.Parent = contentArea
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, 0, 0, 30)
+			btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			btn.BackgroundTransparency = 0.5
+			btn.Text = "  " .. cmd.Name
+			btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+			btn.Font = Enum.Font.Gotham
+			btn.TextSize = 12
+			btn.TextXAlignment = Enum.TextXAlignment.Left
+			btn.Parent = fileList
 			
-			local iconFrame = Instance.new("Frame")
-			iconFrame.Size = UDim2.new(0, 50, 0, 60)
-			iconFrame.Position = UDim2.new(0.5, -25, 0, 10)
-			iconFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			iconFrame.BorderSizePixel = 0
-			iconFrame.Parent = fileBtn
+			local btnCorner = Instance.new("UICorner")
+			btnCorner.CornerRadius = UDim.new(0, 4)
+			btnCorner.Parent = btn
 			
-			local iconCorner = Instance.new("UICorner")
-			iconCorner.CornerRadius = UDim.new(0, 4)
-			iconCorner.Parent = iconFrame
-			
-			local iconFold = Instance.new("Frame")
-			iconFold.Size = UDim2.new(0, 15, 0, 15)
-			iconFold.Position = UDim2.new(1, -15, 0, 0)
-			iconFold.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			iconFold.BorderSizePixel = 0
-			iconFold.Parent = iconFrame
-			
-			local foldGradient = Instance.new("UIGradient")
-			foldGradient.Rotation = 45
-			foldGradient.Transparency = NumberSequence.new{
-				NumberSequenceKeypoint.new(0, 0),
-				NumberSequenceKeypoint.new(0.5, 0),
-				NumberSequenceKeypoint.new(0.51, 1),
-				NumberSequenceKeypoint.new(1, 1)
-			}
-			foldGradient.Parent = iconFold
-			
-			local iconLabel = Instance.new("TextLabel")
-			iconLabel.Text = "LUA"
-			iconLabel.Size = UDim2.new(1, 0, 1, 0)
-			iconLabel.BackgroundTransparency = 1
-			iconLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-			iconLabel.Font = Enum.Font.GothamBold
-			iconLabel.TextSize = 12
-			iconLabel.Parent = iconFrame
-			
-			local nameLabel = Instance.new("TextLabel")
-			nameLabel.Text = cmd.Name -- Use internal name if available
-			nameLabel.Size = UDim2.new(1, 0, 0, 20)
-			nameLabel.Position = UDim2.new(0, 0, 1, -20)
-			nameLabel.BackgroundTransparency = 1
-			nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-			nameLabel.Font = Enum.Font.Gotham
-			nameLabel.TextSize = 12
-			nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-			nameLabel.Parent = fileBtn
-			
-			-- Interaction: Single Click to Edit
-			fileBtn.MouseButton1Click:Connect(function()
+			btn.MouseButton1Click:Connect(function()
 				currentEditingFile = cmd.FileName
 				currentEditingName = cmd.Name
-				editorTitle.Text = "Editing: " .. cmd.Name
+				
+				titleLabel.Text = cmd.Name
+				titleLabel.Position = UDim2.new(0, 35, 0, 0)
+				backButton.Visible = true
+				
 				editorInput.Text = readfile(cmd.Path)
-				editorFrame.Visible = true
+				
+				listView.Visible = false
+				editorView.Visible = true
 			end)
 		end
 		
-		local rows = math.ceil(#cmds / 5)
-		contentArea.CanvasSize = UDim2.new(0, 0, 0, rows * 110 + 20)
+		fileList.CanvasSize = UDim2.new(0, 0, 0, #cmds * 35 + 10)
 	end
 	
-	-- Event Connections
+	local function switchView(viewName)
+		listView.Visible = false
+		editorView.Visible = false
+		exportView.Visible = false
+		importView.Visible = false
+		backButton.Visible = true
+		titleLabel.Position = UDim2.new(0, 35, 0, 0)
+		
+		if viewName == "List" then
+			listView.Visible = true
+			backButton.Visible = false
+			titleLabel.Position = UDim2.new(0, 10, 0, 0)
+			titleLabel.Text = "External Cmds"
+		elseif viewName == "Editor" then
+			editorView.Visible = true
+		elseif viewName == "Export" then
+			exportView.Visible = true
+			titleLabel.Text = "Export"
+		elseif viewName == "Import" then
+			importView.Visible = true
+			titleLabel.Text = "Import"
+		end
+	end
 	
-	switchViewBtn.MouseButton1Click:Connect(function()
+	gameBtn.MouseButton1Click:Connect(function()
 		isGameSpecificView = not isGameSpecificView
 		if isGameSpecificView then
-			local MarketplaceService = game:GetService("MarketplaceService")
-			local success, info = pcall(function()
-				return MarketplaceService:GetProductInfo(game.PlaceId)
-			end)
-			local gameName = success and info.Name or "Unknown Game"
-			switchViewBtn.Text = "Game: " .. gameName
-			switchViewBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-			title.Text = "File Explorer (" .. gameName .. ")"
+			gameBtn.ImageColor3 = Color3.fromRGB(100, 255, 100)
 		else
-			switchViewBtn.Text = "Global"
-			switchViewBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-			title.Text = "File Explorer (Global)"
+			gameBtn.ImageColor3 = Color3.fromRGB(200, 200, 200)
 		end
 		populateList()
 	end)
@@ -446,50 +489,113 @@ return module]]
 		
 		saveCommand(defaultName, template, isGameSpecificView)
 		populateList()
-		
-		currentEditingFile = defaultName .. ".luau"
-		editorTitle.Text = "Editing: " .. defaultName
-		editorInput.Text = template
-		editorFrame.Visible = true
 	end)
 	
 	refreshBtn.MouseButton1Click:Connect(populateList)
 	
-	saveBtn.MouseButton1Click:Connect(function()
-		if currentEditingFile then
-			saveCommand(currentEditingFile, editorInput.Text, isGameSpecificView)
-			editorFrame.Visible = false
-			populateList()
+	exportBtn.MouseButton1Click:Connect(function()
+		local targetFolder = isGameSpecificView and getGameFolder() or GLOBAL_FOLDER
+		local cmds = listCommands(targetFolder)
+		local exportData = {}
+		
+		for _, cmd in ipairs(cmds) do
+			table.insert(exportData, {
+				FileName = cmd.FileName,
+				Content = readfile(cmd.Path)
+			})
 		end
+		
+		local success, json = pcall(function()
+			return HttpService:JSONEncode(exportData)
+		end)
+		
+		if success then
+			exportInput.Text = json
+			switchView("Export")
+		else
+			exportInput.Text = "Error encoding data."
+			switchView("Export")
+		end
+	end)
+	
+	copyExportBtn.MouseButton1Click:Connect(function()
+		setclipboard(exportInput.Text)
+	end)
+	
+	importBtn.MouseButton1Click:Connect(function()
+		importInput.Text = ""
+		switchView("Import")
+	end)
+	
+	saveImportBtn.MouseButton1Click:Connect(function()
+		local json = importInput.Text
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(json)
+		end)
+		
+		if success and type(data) == "table" then
+			local targetFolder = isGameSpecificView and getGameFolder() or GLOBAL_FOLDER
+			local count = 0
+			for _, item in ipairs(data) do
+				if item.FileName and item.Content then
+					local path = targetFolder .. "/" .. item.FileName
+					if not path:match("%.luau$") then path = path .. ".luau" end
+					
+					if not isfile(path) then
+						saveCommand(item.FileName, item.Content, isGameSpecificView)
+						count = count + 1
+					end
+				end
+			end
+			populateList()
+			switchView("List")
+		else
+			importInput.Text = "Invalid JSON data."
+		end
+	end)
+	
+	backButton.MouseButton1Click:Connect(function()
+		switchView("List")
+		currentEditingFile = nil
+	end)
+	
+	clearBtn.MouseButton1Click:Connect(function()
+		editorInput.Text = ""
 	end)
 	
 	deleteBtn.MouseButton1Click:Connect(function()
 		if currentEditingFile then
 			deleteCommand(currentEditingFile, isGameSpecificView)
-			editorFrame.Visible = false
+			switchView("List")
+			currentEditingFile = nil
 			populateList()
 		end
 	end)
 	
-	closeEditorBtn.MouseButton1Click:Connect(function()
-		editorFrame.Visible = false
+	saveBtn.MouseButton1Click:Connect(function()
+		if currentEditingFile then
+			saveCommand(currentEditingFile, editorInput.Text, isGameSpecificView)
+		end
 	end)
 	
-	closeButton.MouseButton1Click:Connect(function()
-		module.Toggle()
-	end)
-	
-	-- Toggle Logic
 	local function toggle(state)
 		if state then
 			populateList()
 			screenGui.Enabled = true
+			
 			TweenService:Create(mainFrame, TweenInfoOpen, {BackgroundTransparency = 0.1}):Play()
-			TweenService:Create(uiStroke, TweenInfoOpen, {Transparency = 0.5}):Play()
+			TweenService:Create(uiStroke, TweenInfoOpen, {Transparency = 0}):Play()
+			TweenService:Create(separator, TweenInfoOpen, {BackgroundTransparency = 0}):Play()
+			TweenService:Create(titleLabel, TweenInfoOpen, {TextTransparency = 0}):Play()
+			TweenService:Create(closeButton, TweenInfoOpen, {TextTransparency = 0}):Play()
 		else
 			local t = TweenService:Create(mainFrame, TweenInfoClose, {BackgroundTransparency = 1})
 			t:Play()
 			TweenService:Create(uiStroke, TweenInfoClose, {Transparency = 1}):Play()
+			TweenService:Create(separator, TweenInfoClose, {BackgroundTransparency = 1}):Play()
+			TweenService:Create(titleLabel, TweenInfoClose, {TextTransparency = 1}):Play()
+			TweenService:Create(closeButton, TweenInfoClose, {TextTransparency = 1}):Play()
+			
 			t.Completed:Connect(function()
 				if mainFrame.BackgroundTransparency == 1 then
 					screenGui.Enabled = false
@@ -497,6 +603,10 @@ return module]]
 			end)
 		end
 	end
+	
+	closeButton.MouseButton1Click:Connect(function()
+		module.Toggle()
+	end)
 	
 	function module.Toggle()
 		if screenGui.Enabled and mainFrame.BackgroundTransparency < 0.5 then
