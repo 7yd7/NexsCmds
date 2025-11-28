@@ -276,6 +276,7 @@ function module.GUI()
             cmdInput:CaptureFocus()
         end)
     end
+
     local currentSuggestions = {} 
     local isOpen = false
     local lastOpenTime = 0
@@ -340,6 +341,18 @@ function module.GUI()
                         createSuggestionItem(player.DisplayName, "@" .. player.Name, imageId, player.Name)
                         table.insert(currentSuggestions, player.Name)
                         count = count + 1
+                    end
+                end
+            elseif type(suggestionType) == "function" then
+                local success, result = pcall(function() return suggestionType(currentArg) end)
+                if success and type(result) == "table" then
+                    for _, item in ipairs(result) do
+                        if count >= 5 then break end
+                        if string.find(string.lower(item), string.lower(currentArg)) then
+                            createSuggestionItem(item, "Suggestion", "", item)
+                            table.insert(currentSuggestions, item)
+                            count = count + 1
+                        end
                     end
                 end
             elseif type(suggestionType) == "table" then
