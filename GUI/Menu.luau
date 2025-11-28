@@ -379,13 +379,19 @@ function module.GUI()
                 end
 
                 if match then
-                    createCommandItem(name, data.Args, data.Desc, data.Aliases, data.ArgsColor, data.ArgsCustomColors)
-                    
-                    if #args == 1 then
-                        table.insert(currentSuggestions, name)
+                    local success, err = pcall(function()
+                        createCommandItem(name, data.Args, data.Desc, data.Aliases, data.ArgsColor, data.ArgsCustomColors)
+                    end)
+
+                    if not success then
+                        warn("[NexsCmds] Failed to display command '" .. tostring(name) .. "': " .. tostring(err))
+                    else
+                        if #args == 1 then
+                            table.insert(currentSuggestions, name)
+                        end
+                        
+                        count = count + 1
                     end
-                    
-                    count = count + 1
                 end
             end
         end
